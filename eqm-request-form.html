@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คำขอครุภัณฑ์การแพทย์</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f6f9; --card:#ffffff; --ink:#1d2b3a; --muted:#6b7a8c; --line:#dfe6ee;
+  --pri:#0f766e; --pri-soft:#e6f4f2; --warn:#b45309; --warn-soft:#fdf3e2; --danger:#c2410c; --danger-soft:#fdf0e8;
+  --hi:#b91c1c; --mid:#b45309; --lo:#15803d;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1720; --card:#17212c; --ink:#e6edf3; --muted:#93a3b5; --line:#2a3846;
+    --pri:#2dd4bf; --pri-soft:#123331; --warn:#fbbf24; --warn-soft:#33270f; --danger:#fb923c; --danger-soft:#3a2416;
+    --hi:#f87171; --mid:#fbbf24; --lo:#4ade80;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Sarabun",system-ui,sans-serif;font-size:16px;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 16px 60px}
+header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
+header h1{margin:0;font-size:1.6rem}
+header p{margin:4px 0 0;color:var(--muted)}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 14px;margin-bottom:16px;font-size:.93rem}
+.steps{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.step{flex:1;min-width:140px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;cursor:pointer;display:flex;gap:10px;align-items:center;font-weight:600;color:var(--muted)}
+.step .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--ink);font-size:.9rem;flex:none}
+.step.active{border-color:var(--pri);color:var(--ink)}
+.step.active .n{background:var(--pri);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:1.2rem}
+.card .sub{margin:0 0 16px;color:var(--muted);font-size:.95rem}
+.card.editing{border-color:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid .full{grid-column:1/-1}
+@media (max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:block;font-weight:600;font-size:.92rem;margin-bottom:4px}
+label .req{color:var(--danger)}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,select:focus{outline:2px solid var(--pri);outline-offset:0;border-color:transparent}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:var(--pri);color:#fff}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.ghost{background:var(--pri-soft);color:var(--pri)}
+.btn.danger{background:var(--danger-soft);color:var(--danger)}
+.btn.sm{padding:6px 10px;font-size:.88rem}
+.row-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.person{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center}
+@media (max-width:640px){.person{grid-template-columns:1fr 1fr}.person .btn{grid-column:span 2}}
+.section-label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:18px 0 8px;flex-wrap:wrap}
+.list{display:grid;gap:10px}
+.unit{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.unit b{font-size:1.02rem}
+.meta{color:var(--muted);font-size:.9rem}
+.chip{display:inline-block;background:var(--pri-soft);color:var(--pri);border-radius:999px;padding:2px 10px;font-size:.82rem;margin:4px 4px 0 0}
+.info{background:var(--pri-soft);border-radius:12px;padding:10px 14px;margin-top:10px;font-size:.93rem}
+.info.warn{background:var(--warn-soft);color:var(--warn)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:.85rem;color:var(--muted);text-align:left;padding:6px;border-bottom:1px solid var(--line);font-weight:600}
+.tbl td{padding:6px;vertical-align:top;border-bottom:1px solid var(--line)}
+.tbl .num{text-align:right}
+.scroll{overflow-x:auto}
+.scroll .tbl.items{min-width:760px}
+.total{display:flex;justify-content:flex-end;gap:12px;align-items:baseline;margin-top:12px;font-size:1.05rem}
+.total strong{font-size:1.4rem;color:var(--pri)}
+.p-สูง{color:var(--hi);font-weight:600}.p-กลาง{color:var(--mid);font-weight:600}.p-ต่ำ{color:var(--lo);font-weight:600}
+.empty{color:var(--muted);text-align:center;padding:18px;border:1px dashed var(--line);border-radius:12px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+@media (max-width:640px){.kpis{grid-template-columns:1fr}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi span{color:var(--muted);font-size:.88rem}.kpi div{font-size:1.5rem;font-weight:700}
+.req{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.req-h{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;background:var(--pri-soft);flex-wrap:wrap}
+.req-h .amt{font-weight:700;color:var(--pri)}
+.req .tbl td,.req .tbl th{padding:6px 14px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar select{width:auto;min-width:200px}
+.hidden{display:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.busy{position:fixed;top:0;left:0;right:0;height:3px;background:var(--pri);transform-origin:left;animation:load 1s ease-in-out infinite;display:none}
+body.loading .busy{display:block}
+@keyframes load{0%{transform:scaleX(0)}50%{transform:scaleX(.7)}100%{transform:scaleX(1);opacity:0}}
+</style>
+</head>
+<body>
+<div class="busy"></div>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>แบบฟอร์มคำขอครุภัณฑ์ทางการแพทย์</h1>
+      <p>ลงทะเบียนหน่วยงาน → กรอกรายการครุภัณฑ์ที่ต้องการ → ดูสรุปงบประมาณ</p>
+    </div>
+    <button class="btn ghost sm" id="reload">รีเฟรชข้อมูล</button>
+  </header>
+
+  <div class="banner hidden" id="demoBanner">
+    <b>โหมดทดลอง</b> — ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ใส่ SCRIPT_URL ในไฟล์เพื่อเชื่อมกับ Google Sheets
+  </div>
+
+  <nav class="steps">
+    <div class="step active" data-tab="units"><span class="n">1</span>ข้อมูลหน่วยงาน</div>
+    <div class="step" data-tab="request"><span class="n">2</span>ครุภัณฑ์ที่ต้องการ</div>
+    <div class="step" data-tab="summary"><span class="n">3</span>สรุป</div>
+  </nav>
+
+  <!-- ขั้นที่ 1 -->
+  <section id="tab-units">
+    <div class="card" id="unitCard">
+      <h2 id="unitTitle">ลงทะเบียนหน่วยงาน</h2>
+      <p class="sub">กรอกครั้งเดียว แล้วหน่วยงานจะไปอยู่ใน dropdown ของขั้นที่ 2</p>
+      <div class="grid">
+        <div><label>ชื่อหน่วยงาน <span class="req">*</span></label><input id="uName" placeholder="เช่น ห้องผ่าตัด"></div>
+        <div><label>สถานที่ตั้ง</label><input id="uLoc" placeholder="เช่น อาคาร A ชั้น 3"></div>
+        <div class="full"><label>หัวหน้าหน่วยงาน <span class="req">*</span></label><input id="uHead" placeholder="ชื่อ-นามสกุล"></div>
+      </div>
+      <div class="section-label">
+        <label style="margin:0">ผู้รับผิดชอบงาน EQM <span class="req">*</span></label>
+        <button class="btn ghost sm" id="addPerson">+ เพิ่มผู้รับผิดชอบ</button>
+      </div>
+      <div id="persons"></div>
+      <div class="row-actions">
+        <button class="btn ghost hidden" id="cancelUnit">ยกเลิกการแก้ไข</button>
+        <button class="btn" id="saveUnit">บันทึกหน่วยงาน</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>หน่วยงานที่ลงทะเบียนแล้ว</h2>
+      <p class="sub">กด "แก้ไข" เพื่อเปลี่ยนข้อมูลหน่วยงานหรือผู้รับผิดชอบ</p>
+      <div class="list" id="unitList"></div>
+    </div>
+  </section>
+
+  <!-- ขั้นที่ 2 -->
+  <section id="tab-request" class="hidden">
+    <div class="card" id="reqCard">
+      <h2 id="reqTitle">รายการครุภัณฑ์ที่ต้องการ</h2>
+      <p class="sub">เลือกหน่วยงาน แล้วเพิ่มได้หลายรายการในคำขอเดียว</p>
+      <div class="grid">
+        <div><label>หน่วยงาน <span class="req">*</span></label><select id="rUnit"></select></div>
+        <div><label>ปีงบประมาณ <span class="req">*</span></label><input id="rYear" inputmode="numeric" maxlength="4"></div>
+      </div>
+      <div id="unitInfo"></div>
+      <div class="section-label">
+        <label style="margin:0">รายการครุภัณฑ์</label>
+        <button class="btn ghost sm" id="addItem">+ เพิ่มรายการ</button>
+      </div>
+      <div class="scroll">
+        <table class="tbl items">
+          <thead><tr>
+            <th style="width:25%">ชื่อครุภัณฑ์</th><th style="width:14%">ประเภท</th>
+            <th class="num" style="width:8%">จำนวน</th><th class="num" style="width:13%">ราคา/หน่วย (บาท)</th>
+            <th class="num" style="width:12%">รวม</th><th style="width:10%">ความสำคัญ</th>
+            <th>เหตุผลความจำเป็น</th><th></th>
+          </tr></thead>
+          <tbody id="items"></tbody>
+        </table>
+      </div>
+      <div class="total"><span>ยอดรวมคำขอ</span><strong id="grand">0</strong><span>บาท</span></div>
+      <div class="row-actions">
+        <button class="btn ghost hidden" id="cancelReq">ยกเลิกการแก้ไข</button>
+        <button class="btn" id="saveReq">บันทึกคำขอ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ขั้นที่ 3 -->
+  <section id="tab-summary" class="hidden">
+    <div class="kpis">
+      <div class="kpi"><span>หน่วยงานที่ยื่นคำขอ</span><div id="kUnits">0</div></div>
+      <div class="kpi"><span>รายการครุภัณฑ์</span><div id="kItems">0</div></div>
+      <div class="kpi"><span>งบประมาณรวม (บาท)</span><div id="kSum">0</div></div>
+    </div>
+    <div class="card">
+      <div class="section-label" style="margin-top:0">
+        <h2 style="margin:0">คำขอทั้งหมด</h2>
+        <div class="toolbar">
+          <select id="fUnit"></select>
+          <select id="fYear"></select>
+          <button class="btn ghost sm" id="exportCsv">ส่งออก CSV</button>
+        </div>
+      </div>
+      <div id="summaryList"></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== ตั้งค่า: วาง URL ของ Web App (ลงท้ายด้วย /exec) ระหว่างเครื่องหมาย ' ' ===== */
+const SCRIPT_URL = '';
+/* ========================================================================== */
+
+const DEMO = !SCRIPT_URL;
+const $ = s => document.querySelector(s);
+const fmt = n => Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2});
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const TYPES = ['ใหม่ (เพิ่มเติม)','ทดแทนของเดิม'];
+const PRI = ['สูง','กลาง','ต่ำ'];
+const thisFY = () => { const d=new Date(); return String(d.getFullYear()+543+(d.getMonth()>=9?1:0)); };
+
+let db = {units:[], requests:[]};
+let editUnitId = null, editReqId = null;
+
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2400); }
+function setBusy(on){
+  document.body.classList.toggle('loading',on);
+  document.querySelectorAll('#saveUnit,#saveReq,#reload').forEach(b=>b.disabled=on);
+}
+
+/* ---------- เชื่อมต่อข้อมูล ---------- */
+async function api(action, body={}){
+  setBusy(true);
+  try{
+    let res;
+    if(DEMO) res = mock(action, body);
+    else if(action==='list') res = await (await fetch(SCRIPT_URL)).json();
+    else res = await (await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+                                               body:JSON.stringify({action,...body})})).json();
+    if(!res.ok) throw new Error(res.error||'เกิดข้อผิดพลาด');
+    db = res.data; renderAll(); return true;
+  }catch(e){
+    toast(e instanceof TypeError ? 'เชื่อมต่อ Google Sheets ไม่ได้ ตรวจ SCRIPT_URL หรืออินเทอร์เน็ต' : e.message);
+    return false;
+  }finally{ setBusy(false); }
+}
+
+/* โหมดทดลอง: จำลองการทำงานเหมือน Code.gs แต่เก็บในเบราว์เซอร์ */
+function mock(action, b){
+  let s=null; try{ s=JSON.parse(localStorage.getItem('eqm-demo')); }catch(e){}
+  s = s || {units:[],requests:[],log:[]};
+  const put=()=>{ try{ localStorage.setItem('eqm-demo',JSON.stringify(s)); }catch(e){} };
+  try{
+    if(action==='saveUnit'){
+      const u=b.unit;
+      if(!u.name||!u.head) throw new Error('กรุณากรอกชื่อหน่วยงานและหัวหน้าหน่วยงาน');
+      if(!u.persons.length) throw new Error('ต้องมีผู้รับผิดชอบ EQM อย่างน้อย 1 คน');
+      if(s.units.some(x=>x.name===u.name&&x.id!==u.id)) throw new Error('มีหน่วยงานชื่อนี้แล้ว');
+      const i=s.units.findIndex(x=>x.id===u.id);
+      if(i>=0){ s.log.push({t:new Date(),a:'แก้ไขหน่วยงาน',before:s.units[i],after:u}); s.units[i]=u; }
+      else { u.id=uid(); s.units.push(u); s.log.push({t:new Date(),a:'เพิ่มหน่วยงาน',after:u}); }
+      put();
+    }
+    if(action==='saveRequest'){
+      const r=b.request;
+      if(!s.units.some(u=>u.id===r.unitId)) throw new Error('ไม่พบหน่วยงาน');
+      const i=s.requests.findIndex(x=>x.id===r.id);
+      if(i>=0){ r.at=s.requests[i].at; s.log.push({t:new Date(),a:'แก้ไขคำขอ',before:s.requests[i],after:r}); s.requests[i]=r; }
+      else { r.id=uid(); r.at=new Date().toISOString(); s.requests.push(r); s.log.push({t:new Date(),a:'เพิ่มคำขอ',after:r}); }
+      put();
+    }
+    return {ok:true, data:{units:s.units, requests:s.requests}};
+  }catch(e){ return {ok:false, error:e.message}; }
+}
+
+/* ---------- แท็บ ---------- */
+document.querySelectorAll('.step').forEach(s=>s.onclick=()=>go(s.dataset.tab));
+function go(tab){
+  document.querySelectorAll('.step').forEach(s=>s.classList.toggle('active',s.dataset.tab===tab));
+  ['units','request','summary'].forEach(t=>$('#tab-'+t).classList.toggle('hidden',t!==tab));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function renderAll(){ renderUnits(); renderUnitSelect(); renderSummary(); }
+
+/* ---------- ขั้นที่ 1: หน่วยงาน ---------- */
+function personRow(p={}){
+  const d=document.createElement('div'); d.className='person';
+  d.innerHTML=`<input class="pName" placeholder="ชื่อ-นามสกุล" value="${esc(p.name)}">
+    <input class="pPos" placeholder="ตำแหน่ง" value="${esc(p.pos)}">
+    <input class="pTel" placeholder="เบอร์โทร" inputmode="tel" value="${esc(p.tel)}">
+    <button class="btn danger sm" type="button">ลบ</button>`;
+  d.querySelector('button').onclick=()=>{
+    if($('#persons').children.length>1) d.remove(); else toast('ต้องมีผู้รับผิดชอบอย่างน้อย 1 คน'); };
+  $('#persons').appendChild(d);
+}
+$('#addPerson').onclick=()=>personRow();
+
+function resetUnitForm(){
+  editUnitId=null; ['#uName','#uLoc','#uHead'].forEach(s=>$(s).value='');
+  $('#persons').innerHTML=''; personRow();
+  $('#unitTitle').textContent='ลงทะเบียนหน่วยงาน';
+  $('#unitCard').classList.remove('editing'); $('#cancelUnit').classList.add('hidden');
+}
+$('#cancelUnit').onclick=resetUnitForm;
+
+$('#saveUnit').onclick=async()=>{
+  const persons=[...document.querySelectorAll('.person')].map(r=>({
+    name:r.querySelector('.pName').value.trim(), pos:r.querySelector('.pPos').value.trim(), tel:r.querySelector('.pTel').value.trim()
+  })).filter(p=>p.name);
+  const u={id:editUnitId, name:$('#uName').value.trim(), loc:$('#uLoc').value.trim(), head:$('#uHead').value.trim(), persons};
+  if(!u.name||!u.head) return toast('กรุณากรอกชื่อหน่วยงานและหัวหน้าหน่วยงาน');
+  if(!persons.length) return toast('กรุณาใส่ผู้รับผิดชอบ EQM อย่างน้อย 1 คน');
+  const wasEdit=!!editUnitId;
+  if(await api('saveUnit',{unit:u})){ resetUnitForm(); toast(wasEdit?'แก้ไขหน่วยงานแล้ว':'บันทึกหน่วยงานแล้ว'); }
+};
+
+function renderUnits(){
+  const el=$('#unitList');
+  if(!db.units.length){ el.innerHTML='<div class="empty">ยังไม่มีหน่วยงาน</div>'; return; }
+  el.innerHTML=[...db.units].sort((a,b)=>a.name.localeCompare(b.name,'th')).map(u=>`<div class="unit">
+    <div><b>${esc(u.name)}</b> <span class="meta">${u.loc?'· '+esc(u.loc):''}</span>
+      <div class="meta">หัวหน้า: ${esc(u.head)}</div>
+      <div>${u.persons.map(p=>`<span class="chip">EQM: ${esc(p.name)}${p.tel?' · '+esc(p.tel):''}</span>`).join('')}</div></div>
+    <div style="display:flex;gap:6px;align-items:start">
+      <button class="btn ghost sm" data-req="${u.id}">กรอกคำขอ →</button>
+      <button class="btn ghost sm" data-edit="${u.id}">แก้ไข</button></div></div>`).join('');
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editUnit(b.dataset.edit));
+  el.querySelectorAll('[data-req]').forEach(b=>b.onclick=()=>{ resetReqForm(); $('#rUnit').value=b.dataset.req; showUnitInfo(); go('request'); });
+}
+function editUnit(id){
+  const u=db.units.find(x=>x.id===id); if(!u) return;
+  editUnitId=id; $('#uName').value=u.name; $('#uLoc').value=u.loc||''; $('#uHead').value=u.head;
+  $('#persons').innerHTML=''; (u.persons.length?u.persons:[{}]).forEach(personRow);
+  $('#unitTitle').textContent='แก้ไขหน่วยงาน: '+u.name;
+  $('#unitCard').classList.add('editing'); $('#cancelUnit').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- ขั้นที่ 2: คำขอ ---------- */
+function renderUnitSelect(){
+  const cur=$('#rUnit').value;
+  $('#rUnit').innerHTML='<option value="">— เลือกหน่วยงาน —</option>'+
+    [...db.units].sort((a,b)=>a.name.localeCompare(b.name,'th'))
+      .map(u=>`<option value="${u.id}">${esc(u.name)}${u.loc?' ('+esc(u.loc)+')':''}</option>`).join('');
+  $('#rUnit').value=cur; showUnitInfo();
+}
+function showUnitInfo(){
+  const id=$('#rUnit').value, u=db.units.find(x=>x.id===id);
+  if(!u){ $('#unitInfo').innerHTML=db.units.length?'':'<div class="info warn">ยังไม่มีหน่วยงาน กรุณาลงทะเบียนในขั้นที่ 1 ก่อน</div>'; return; }
+  let html=`<div class="info">หัวหน้า: <b>${esc(u.head)}</b> · ผู้รับผิดชอบ EQM: ${u.persons.map(p=>esc(p.name)).join(', ')}</div>`;
+  const dup=db.requests.find(r=>r.unitId===id && r.year===$('#rYear').value.trim() && r.id!==editReqId);
+  if(dup) html+=`<div class="info warn">หน่วยงานนี้มีคำขอปีงบ ${esc(dup.year)} อยู่แล้ว — ถ้าต้องการเพิ่มรายการ แนะนำให้กด "แก้ไข" คำขอเดิมในหน้าสรุป</div>`;
+  $('#unitInfo').innerHTML=html;
+}
+$('#rUnit').onchange=showUnitInfo;
+$('#rYear').oninput=showUnitInfo;
+
+function itemRow(it={}){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input class="iName" placeholder="เช่น เครื่องจี้ไฟฟ้า" value="${esc(it.name)}"></td>
+    <td><select class="iType">${TYPES.map(t=>`<option ${it.type===t?'selected':''}>${t}</option>`).join('')}</select></td>
+    <td><input class="iQty" type="number" min="1" value="${it.qty||1}" style="text-align:right"></td>
+    <td><input class="iPrice" type="number" min="0" step="0.01" value="${it.price??''}" placeholder="0" style="text-align:right"></td>
+    <td class="num iSum" style="padding-top:14px">0</td>
+    <td><select class="iPri">${PRI.map(p=>`<option ${(it.pri||'กลาง')===p?'selected':''}>${p}</option>`).join('')}</select></td>
+    <td><input class="iWhy" placeholder="เช่น เครื่องเดิมใช้งาน 12 ปี ซ่อมบ่อย" value="${esc(it.why)}"></td>
+    <td><button class="btn danger sm" type="button">ลบ</button></td>`;
+  tr.querySelector('button').onclick=()=>{ if($('#items').children.length>1){ tr.remove(); calc(); } };
+  tr.querySelectorAll('input').forEach(i=>i.oninput=calc);
+  $('#items').appendChild(tr); calc();
+}
+function calc(){
+  let g=0; [...$('#items').children].forEach(tr=>{
+    const s=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iPrice').value||0);
+    tr.querySelector('.iSum').textContent=fmt(s); g+=s; });
+  $('#grand').textContent=fmt(g);
+}
+$('#addItem').onclick=()=>itemRow();
+
+function resetReqForm(){
+  editReqId=null; $('#items').innerHTML=''; itemRow(); $('#rYear').value=thisFY();
+  $('#reqTitle').textContent='รายการครุภัณฑ์ที่ต้องการ';
+  $('#reqCard').classList.remove('editing'); $('#cancelReq').classList.add('hidden'); $('#rUnit').disabled=false;
+  showUnitInfo();
+}
+$('#cancelReq').onclick=()=>{ resetReqForm(); go('summary'); };
+
+function editRequest(id){
+  const r=db.requests.find(x=>x.id===id); if(!r) return;
+  const u=db.units.find(x=>x.id===r.unitId);
+  editReqId=id; $('#rUnit').value=r.unitId; $('#rUnit').disabled=true; $('#rYear').value=r.year;
+  $('#items').innerHTML=''; r.items.forEach(itemRow);
+  $('#reqTitle').textContent='แก้ไขคำขอ: '+(u?u.name:'')+' ปีงบ '+r.year;
+  $('#reqCard').classList.add('editing'); $('#cancelReq').classList.remove('hidden');
+  showUnitInfo(); go('request');
+}
+
+$('#saveReq').onclick=async()=>{
+  const unitId=$('#rUnit').value, year=$('#rYear').value.trim();
+  if(!unitId) return toast('กรุณาเลือกหน่วยงาน');
+  if(!/^\d{4}$/.test(year)) return toast('กรุณาใส่ปีงบประมาณ 4 หลัก เช่น '+thisFY());
+  const rows=[...$('#items').children].map(tr=>({
+    name:tr.querySelector('.iName').value.trim(), type:tr.querySelector('.iType').value,
+    qty:+tr.querySelector('.iQty').value||0, price:+tr.querySelector('.iPrice').value||0,
+    pri:tr.querySelector('.iPri').value, why:tr.querySelector('.iWhy').value.trim()}));
+  const items=rows.filter(i=>i.name);
+  if(!items.length) return toast('กรุณากรอกอย่างน้อย 1 รายการ');
+  if(items.some(i=>i.qty<=0||i.price<=0)) return toast('กรุณาใส่จำนวนและราคาให้ครบทุกรายการ');
+  const wasEdit=!!editReqId;
+  if(await api('saveRequest',{request:{id:editReqId, unitId, year, items}})){
+    resetReqForm(); toast(wasEdit?'แก้ไขคำขอแล้ว':'บันทึกคำขอแล้ว');
+    if(wasEdit) go('summary');
+  }
+};
+
+/* ---------- ขั้นที่ 3: สรุป ---------- */
+const reqTotal = r => r.items.reduce((a,i)=>a+i.qty*i.price,0);
+function filtered(){
+  const fu=$('#fUnit').value, fy=$('#fYear').value;
+  return db.requests.filter(r=>(!fu||r.unitId===fu)&&(!fy||r.year===fy));
+}
+function renderSummary(){
+  const fu=$('#fUnit').value, fy=$('#fYear').value;
+  $('#fUnit').innerHTML='<option value="">ทุกหน่วยงาน</option>'+
+    [...db.units].sort((a,b)=>a.name.localeCompare(b.name,'th')).map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  const years=[...new Set(db.requests.map(r=>r.year))].sort().reverse();
+  $('#fYear').innerHTML='<option value="">ทุกปีงบประมาณ</option>'+years.map(y=>`<option>${esc(y)}</option>`).join('');
+  $('#fUnit').value=fu; $('#fYear').value=years.includes(fy)?fy:'';
+
+  const reqs=filtered(), name=id=>(db.units.find(u=>u.id===id)||{}).name||'(ไม่พบหน่วยงาน)';
+  $('#kUnits').textContent=new Set(reqs.map(r=>r.unitId)).size;
+  $('#kItems').textContent=reqs.reduce((a,r)=>a+r.items.length,0);
+  $('#kSum').textContent=fmt(reqs.reduce((a,r)=>a+reqTotal(r),0));
+  if(!reqs.length){ $('#summaryList').innerHTML='<div class="empty">ยังไม่มีคำขอ</div>'; return; }
+
+  $('#summaryList').innerHTML=reqs.sort((a,b)=>name(a.unitId).localeCompare(name(b.unitId),'th')||b.year.localeCompare(a.year))
+    .map(r=>`<div class="req">
+      <div class="req-h"><div><b>${esc(name(r.unitId))}</b> <span class="meta">· ปีงบ ${esc(r.year)} · ${r.items.length} รายการ</span></div>
+        <div class="toolbar"><span class="amt">${fmt(reqTotal(r))} บาท</span>
+        <button class="btn ghost sm" data-edit-req="${r.id}">แก้ไข</button></div></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>ครุภัณฑ์</th><th>ประเภท</th><th class="num">จำนวน</th>
+        <th class="num">ราคา/หน่วย</th><th class="num">รวม</th><th>ความสำคัญ</th></tr></thead><tbody>
+      ${r.items.map(i=>`<tr><td>${esc(i.name)}${i.why?`<div class="meta">${esc(i.why)}</div>`:''}</td><td>${esc(i.type)}</td>
+        <td class="num">${i.qty}</td><td class="num">${fmt(i.price)}</td><td class="num"><b>${fmt(i.qty*i.price)}</b></td>
+        <td class="p-${esc(i.pri)}">${esc(i.pri)}</td></tr>`).join('')}
+      </tbody></table></div></div>`).join('');
+  document.querySelectorAll('[data-edit-req]').forEach(b=>b.onclick=()=>editRequest(b.dataset.editReq));
+}
+$('#fUnit').onchange=renderSummary; $('#fYear').onchange=renderSummary;
+
+$('#exportCsv').onclick=()=>{
+  const reqs=filtered(); if(!reqs.length) return toast('ยังไม่มีข้อมูล');
+  const head=['หน่วยงาน','สถานที่ตั้ง','หัวหน้าหน่วยงาน','ผู้รับผิดชอบ EQM','ปีงบประมาณ','ครุภัณฑ์','ประเภท','จำนวน','ราคาต่อหน่วย','รวม','ความสำคัญ','เหตุผล'];
+  const rows=[]; reqs.forEach(r=>{ const u=db.units.find(x=>x.id===r.unitId)||{persons:[]};
+    r.items.forEach(i=>rows.push([u.name,u.loc,u.head,u.persons.map(p=>p.name).join(', '),r.year,i.name,i.type,i.qty,i.price,i.qty*i.price,i.pri,i.why])); });
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv='\ufeff'+[head,...rows].map(a=>a.map(q).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='คำขอครุภัณฑ์.csv'; a.click();
+};
+
+$('#reload').onclick=async()=>{ if(await api('list')) toast('อัปเดตข้อมูลล่าสุดแล้ว'); };
+
+/* ---------- เริ่มต้น ---------- */
+if(DEMO) $('#demoBanner').classList.remove('hidden');
+resetUnitForm(); resetReqForm(); renderAll();
+api('list');
+</script>
+</body>
+</html>
