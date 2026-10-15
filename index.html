@@ -40,6 +40,7 @@ header p{margin:4px 0 0;color:var(--muted)}
 label{display:block;font-weight:600;font-size:.92rem;margin-bottom:4px}
 label .req{color:var(--danger)}
 input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+input.bad{border-color:var(--danger);background:var(--danger-soft)}
 input:focus,select:focus{outline:2px solid var(--pri);outline-offset:0;border-color:transparent}
 .btn{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:var(--pri);color:#fff}
 .btn:disabled{opacity:.5;cursor:wait}
@@ -177,9 +178,10 @@ body.loading .busy{display:block}
       <div class="section-label" style="margin-top:0">
         <h2 style="margin:0">คำขอทั้งหมด</h2>
         <div class="toolbar">
-          <select id="fUnit"></select>
+          <select id="fUnit" aria-label="กรองหน่วยงาน"></select>
           <select id="fYear"></select>
-          <button class="btn ghost sm" id="exportCsv">ส่งออก CSV</button>
+          <button class="btn ghost sm" id="printForms">พิมพ์ใบเสนอขอ</button>
+          <button class="btn sm" id="exportXlsx">ส่งออก Excel</button>
         </div>
       </div>
       <div id="summaryList"></div>
@@ -191,6 +193,9 @@ body.loading .busy{display:block}
 <script>
 /* ===== ตั้งค่า: วาง URL ของ Web App (ลงท้ายด้วย /exec) ระหว่างเครื่องหมาย ' ' ===== */
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwoYadrtx359fTAqVDF6npAaQnNgzWamUdwDYSPIfO1kpcP9FXeHrq2yXBhxDZnX-Tu0Q/exec';
+/* ชื่อที่ใช้บนหัวรายงาน Excel และใบเสนอขอที่พิมพ์ */
+const HOSPITAL_NAME  = 'โรงพยาบาลศีขรภูมิ';
+const APPROVER_TITLE = '';
 /* ========================================================================== */
 
 const DEMO = !SCRIPT_URL;
@@ -199,6 +204,7 @@ const fmt = n => Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2});
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const TYPES = ['ใหม่ (เพิ่มเติม)','ทดแทนของเดิม'];
+const num = v => { const n=parseFloat(String(v??'').replace(/[,\s฿บาท]/g,'')); return isFinite(n)?n:0; };
 const PRI = ['สูง','กลาง','ต่ำ'];
 const thisFY = () => { const d=new Date(); return String(d.getFullYear()+543+(d.getMonth()>=9?1:0)); };
 
@@ -342,19 +348,20 @@ function itemRow(it={}){
   const tr=document.createElement('tr');
   tr.innerHTML=`<td><input class="iName" placeholder="เช่น เครื่องจี้ไฟฟ้า" value="${esc(it.name)}"></td>
     <td><select class="iType">${TYPES.map(t=>`<option ${it.type===t?'selected':''}>${t}</option>`).join('')}</select></td>
-    <td><input class="iQty" type="number" min="1" value="${it.qty||1}" style="text-align:right"></td>
-    <td><input class="iPrice" type="number" min="0" step="0.01" value="${it.price??''}" placeholder="0" style="text-align:right"></td>
+    <td><input class="iQty" type="text" inputmode="numeric" value="${it.qty||1}" style="text-align:right"></td>
+    <td><input class="iPrice" type="text" inputmode="decimal" value="${it.price?fmt(it.price):''}" placeholder="เช่น 150,000" style="text-align:right"></td>
     <td class="num iSum" style="padding-top:14px">0</td>
     <td><select class="iPri">${PRI.map(p=>`<option ${(it.pri||'กลาง')===p?'selected':''}>${p}</option>`).join('')}</select></td>
     <td><input class="iWhy" placeholder="เช่น เครื่องเดิมใช้งาน 12 ปี ซ่อมบ่อย" value="${esc(it.why)}"></td>
     <td><button class="btn danger sm" type="button">ลบ</button></td>`;
   tr.querySelector('button').onclick=()=>{ if($('#items').children.length>1){ tr.remove(); calc(); } };
-  tr.querySelectorAll('input').forEach(i=>i.oninput=calc);
+  tr.querySelectorAll('input').forEach(i=>i.oninput=()=>{ i.classList.remove('bad'); calc(); });
+  const pr=tr.querySelector('.iPrice'); pr.onblur=()=>{ if(num(pr.value)>0) pr.value=fmt(num(pr.value)); };
   $('#items').appendChild(tr); calc();
 }
 function calc(){
   let g=0; [...$('#items').children].forEach(tr=>{
-    const s=(+tr.querySelector('.iQty').value||0)*(+tr.querySelector('.iPrice').value||0);
+    const s=num(tr.querySelector('.iQty').value)*num(tr.querySelector('.iPrice').value);
     tr.querySelector('.iSum').textContent=fmt(s); g+=s; });
   $('#grand').textContent=fmt(g);
 }
@@ -382,13 +389,18 @@ $('#saveReq').onclick=async()=>{
   const unitId=$('#rUnit').value, year=$('#rYear').value.trim();
   if(!unitId) return toast('กรุณาเลือกหน่วยงาน');
   if(!/^\d{4}$/.test(year)) return toast('กรุณาใส่ปีงบประมาณ 4 หลัก เช่น '+thisFY());
-  const rows=[...$('#items').children].map(tr=>({
+  const trs=[...$('#items').children];
+  const rows=trs.map(tr=>({
     name:tr.querySelector('.iName').value.trim(), type:tr.querySelector('.iType').value,
-    qty:+tr.querySelector('.iQty').value||0, price:+tr.querySelector('.iPrice').value||0,
+    qty:num(tr.querySelector('.iQty').value), price:num(tr.querySelector('.iPrice').value),
     pri:tr.querySelector('.iPri').value, why:tr.querySelector('.iWhy').value.trim()}));
   const items=rows.filter(i=>i.name);
   if(!items.length) return toast('กรุณากรอกอย่างน้อย 1 รายการ');
-  if(items.some(i=>i.qty<=0||i.price<=0)) return toast('กรุณาใส่จำนวนและราคาให้ครบทุกรายการ');
+  let bad=false;
+  rows.forEach((i,n)=>{ if(!i.name) return;
+    if(i.qty<=0){ trs[n].querySelector('.iQty').classList.add('bad'); bad=true; }
+    if(i.price<=0){ trs[n].querySelector('.iPrice').classList.add('bad'); bad=true; } });
+  if(bad) return toast('กรุณาใส่จำนวนและราคาให้ถูกต้อง (ช่องที่มีกรอบสีแดง)');
   const wasEdit=!!editReqId;
   if(await api('saveRequest',{request:{id:editReqId, unitId, year, items}})){
     resetReqForm(); toast(wasEdit?'แก้ไขคำขอแล้ว':'บันทึกคำขอแล้ว');
@@ -431,16 +443,248 @@ function renderSummary(){
 }
 $('#fUnit').onchange=renderSummary; $('#fYear').onchange=renderSummary;
 
-$('#exportCsv').onclick=()=>{
-  const reqs=filtered(); if(!reqs.length) return toast('ยังไม่มีข้อมูล');
-  const head=['หน่วยงาน','สถานที่ตั้ง','หัวหน้าหน่วยงาน','ผู้รับผิดชอบ EQM','ปีงบประมาณ','ครุภัณฑ์','ประเภท','จำนวน','ราคาต่อหน่วย','รวม','ความสำคัญ','เหตุผล'];
-  const rows=[]; reqs.forEach(r=>{ const u=db.units.find(x=>x.id===r.unitId)||{persons:[]};
-    r.items.forEach(i=>rows.push([u.name,u.loc,u.head,u.persons.map(p=>p.name).join(', '),r.year,i.name,i.type,i.qty,i.price,i.qty*i.price,i.pri,i.why])); });
-  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const csv='\ufeff'+[head,...rows].map(a=>a.map(q).join(',')).join('\r\n');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download='คำขอครุภัณฑ์.csv'; a.click();
-};
+/* ---------- ส่งออก: เตรียมข้อมูล ---------- */
+const PRI_ORDER = {'สูง':0,'กลาง':1,'ต่ำ':2};
+function exportData(){
+  const reqs = filtered();
+  const fy = $('#fYear').value;
+  const years = [...new Set(reqs.map(r=>r.year))].sort();
+  const yearLabel = fy ? fy : (years.length===1 ? years[0] : 'ทุกปีงบประมาณ ('+years.join(', ')+')');
+  const unitOf = id => db.units.find(u=>u.id===id) || {name:'(ไม่พบหน่วยงาน)', loc:'', head:'', persons:[]};
+  const eqmOf = u => u.persons.map(p=>p.name).join(', ');
+  // กลุ่ม = หน่วยงาน + ปีงบ
+  const groups = reqs.map(r=>({ r, u:unitOf(r.unitId) }))
+    .sort((a,b)=>a.u.name.localeCompare(b.u.name,'th') || a.r.year.localeCompare(b.r.year));
+  const flat = [];
+  groups.forEach(g=>g.r.items.forEach(i=>flat.push({ ...i, total:i.qty*i.price, unit:g.u.name, loc:g.u.loc, head:g.u.head, eqm:eqmOf(g.u), year:g.r.year })));
+  return { groups, flat, yearLabel, multiYear: years.length>1, eqmOf };
+}
+const nowTH = () => new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'});
+
+/* ---------- ส่งออก Excel ---------- */
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve();
+  return new Promise((ok,fail)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload=ok; s.onerror=()=>fail(new Error('โหลดตัวสร้าง Excel ไม่ได้ ตรวจอินเทอร์เน็ต')); document.head.appendChild(s); });
+}
+
+const XC = { teal:'FF0F5F59', tealSoft:'FFE6F1EF', grey:'FFF3F6F8', line:'FFD0D7DE', white:'FFFFFFFF', muted:'FF56657A',
+  pri:{'สูง':['FFFDECEA','FFA1261A'],'กลาง':['FFFFF4E0','FF8A5300'],'ต่ำ':['FFE8F5EC','FF24663F']}, warn:'FFFFF2CC' };
+const FONT = 'Tahoma';
+const MONEY = '#,##0;-#,##0;"-"';
+const fill = c => ({type:'pattern', pattern:'solid', fgColor:{argb:c}});
+const border = { top:{style:'thin',color:{argb:XC.line}}, left:{style:'thin',color:{argb:XC.line}},
+                 bottom:{style:'thin',color:{argb:XC.line}}, right:{style:'thin',color:{argb:XC.line}} };
+
+function xTitle(ws, title, sub, lastCol){
+  ws.mergeCells(1,1,1,lastCol); ws.mergeCells(2,1,2,lastCol);
+  Object.assign(ws.getCell(1,1), { value:title, font:{name:FONT,size:14,bold:true} });
+  Object.assign(ws.getCell(2,1), { value:sub, font:{name:FONT,size:10,color:{argb:XC.muted}} });
+  ws.getRow(1).height = 24;
+}
+function xHeader(ws, rowNo, labels){
+  const row = ws.getRow(rowNo); row.values = labels; row.height = 22;
+  row.eachCell(c=>{ c.font={name:FONT,bold:true,color:{argb:XC.white}}; c.fill=fill(XC.teal); c.border=border;
+    c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; });
+}
+function xRow(ws, values, opt={}){
+  const row = ws.addRow(values);
+  row.eachCell({includeEmpty:true},(c,col)=>{
+    c.font={name:FONT, bold:!!opt.bold, color:{argb:opt.color||'FF1D2B3A'}}; c.border=border;
+    c.alignment={vertical:'top', wrapText:true, horizontal:(opt.align&&opt.align[col-1])||'left'};
+    if(opt.money&&opt.money.includes(col)) c.numFmt=MONEY;
+    if(opt.fill) c.fill=fill(opt.fill);
+  });
+  return row;
+}
+function priCell(c, pri){ const p=XC.pri[pri]; if(!p) return;
+  c.fill=fill(p[0]); c.font={name:FONT,bold:true,color:{argb:p[1]}}; c.alignment={horizontal:'center',vertical:'top'}; }
+function setup(ws, widths, freezeRow, landscape=true){
+  ws.columns = widths.map(w=>({width:w}));
+  ws.views = [{state:'frozen', ySplit:freezeRow, showGridLines:false}];
+  ws.pageSetup = { paperSize:9, orientation:landscape?'landscape':'portrait', fitToPage:true, fitToWidth:1, fitToHeight:0,
+    margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.2,footer:0.2}, printTitlesRow:`${freezeRow}:${freezeRow}` };
+  ws.headerFooter = { oddFooter:'&L'+HOSPITAL_NAME+'&Rหน้า &P / &N' };
+}
+
+async function exportExcel(){
+  const d = exportData(); if(!d.flat.length) return toast('ยังไม่มีข้อมูลให้ส่งออก');
+  const btn=$('#exportXlsx'); btn.disabled=true; btn.textContent='กำลังสร้างไฟล์…';
+  try{
+    await loadExcelJS();
+    const wb = new ExcelJS.Workbook(); wb.creator='ระบบคำขอครุภัณฑ์'; wb.created=new Date();
+    wb.calcProperties.fullCalcOnLoad = true;
+    const sub = `${HOSPITAL_NAME} · ปีงบประมาณ ${d.yearLabel} · ส่งออกเมื่อ ${nowTH()} · หน่วย: บาท`;
+
+    /* ชีต 1: สรุปรายหน่วยงาน */
+    const s1 = wb.addWorksheet('สรุปรายหน่วยงาน', {properties:{tabColor:{argb:XC.teal}}});
+    setup(s1, [6,26,20,24,26,10,8,14,14,14,16], 4);
+    xTitle(s1, 'สรุปคำขอครุภัณฑ์ทางการแพทย์ แยกตามหน่วยงาน', sub, 11);
+    xHeader(s1, 4, ['ที่','หน่วยงาน','สถานที่ตั้ง','หัวหน้าหน่วยงาน','ผู้รับผิดชอบ EQM','ปีงบ','รายการ','ความสำคัญสูง','ปานกลาง','ต่ำ','รวม']);
+    ['H','I','J'].forEach((col,k)=>{ const p=XC.pri[PRI[k]]; s1.getCell(col+'4').fill=fill(p[1]); });
+    d.groups.forEach((g,k)=>{
+      const sum = p => g.r.items.filter(i=>i.pri===p).reduce((a,i)=>a+i.qty*i.price,0);
+      const rn = 5+k;
+      const row = xRow(s1, [k+1, g.u.name, g.u.loc, g.u.head, d.eqmOf(g.u), g.r.year, g.r.items.length,
+        sum('สูง'), sum('กลาง'), sum('ต่ำ'), {formula:`SUM(H${rn}:J${rn})`, result:reqTotal(g.r)}],
+        { money:[8,9,10,11], align:['center',,,,,'center','center'] });
+      row.getCell(2).font={name:FONT,bold:true}; row.getCell(11).font={name:FONT,bold:true};
+      [8,9,10].forEach((c,j)=>row.getCell(c).fill=fill(XC.pri[PRI[j]][0]));
+    });
+    const last1 = 4+d.groups.length, t1 = last1+1;
+    const tot = xRow(s1, ['รวมทั้งสิ้น','','','','','',{formula:`SUM(G5:G${last1})`},
+      ...['H','I','J','K'].map(c=>({formula:`SUM(${c}5:${c}${last1})`}))],
+      { bold:true, fill:XC.tealSoft, money:[8,9,10,11], align:[,,,,,,'center'] });
+    s1.mergeCells(t1,1,t1,6); tot.getCell(1).alignment={horizontal:'right'};
+    tot.getCell(11).font={name:FONT,bold:true,size:12,color:{argb:XC.teal}};
+    const pr = xRow(s1, ['สัดส่วนของงบรวม','','','','','','',
+      ...['H','I','J','K'].map(c=>({formula:`IF($K$${t1}=0,0,${c}${t1}/$K$${t1})`}))], { color:XC.muted });
+    s1.mergeCells(t1+1,1,t1+1,7); pr.getCell(1).alignment={horizontal:'right'};
+    [8,9,10,11].forEach(c=>{ pr.getCell(c).numFmt='0.0%'; pr.getCell(c).alignment={horizontal:'right'}; });
+
+    /* ชีต 2: รายละเอียดครุภัณฑ์ */
+    const s2 = wb.addWorksheet('รายละเอียดครุภัณฑ์');
+    setup(s2, [6,32,16,9,14,15,12,46], 4);
+    xTitle(s2, 'รายละเอียดครุภัณฑ์ที่ขอ แยกตามหน่วยงาน', sub, 8);
+    xHeader(s2, 4, ['ที่','รายการครุภัณฑ์','ประเภท','จำนวน','ราคา/หน่วย','รวมเงิน','ความสำคัญ','เหตุผลความจำเป็น']);
+    const subCells=[], qtyCells=[];
+    d.groups.forEach(g=>{
+      const h = xRow(s2, [`${g.u.name}${g.u.loc?'  ·  '+g.u.loc:''}   |   ปีงบ ${g.r.year}   |   หัวหน้า: ${g.u.head}   |   EQM: ${d.eqmOf(g.u)}`], {fill:XC.grey});
+      s2.mergeCells(h.number,1,h.number,8); h.getCell(1).font={name:FONT,bold:true};
+      const first = h.number+1;
+      g.r.items.forEach((i,k)=>{
+        const row = xRow(s2, [k+1, i.name, i.type, i.qty, i.price, {formula:`D${first+k}*E${first+k}`, result:i.qty*i.price}, i.pri, i.why],
+          { money:[5,6], align:['center',,'center','center'] });
+        row.getCell(2).font={name:FONT,bold:true}; priCell(row.getCell(7), i.pri);
+      });
+      const last = first+g.r.items.length-1;
+      const st = xRow(s2, [`รวม ${g.u.name}`,'','',{formula:`SUM(D${first}:D${last})`},'',{formula:`SUM(F${first}:F${last})`},'',''],
+        { bold:true, fill:XC.tealSoft, money:[6], align:[,,,'center'] });
+      s2.mergeCells(st.number,1,st.number,3); st.getCell(1).alignment={horizontal:'right'};
+      st.getCell(6).font={name:FONT,bold:true,color:{argb:XC.teal}};
+      subCells.push('F'+st.number); qtyCells.push('D'+st.number);
+    });
+    const gt = xRow(s2, [`รวมทั้งสิ้น ${d.flat.length} รายการ`,'','',{formula:qtyCells.join('+')},'',{formula:subCells.join('+')},'',''],
+      { bold:true, fill:XC.teal, color:'FFFFFFFF', money:[6], align:[,,,'center'] });
+    s2.mergeCells(gt.number,1,gt.number,3); gt.getCell(1).alignment={horizontal:'right'};
+
+    /* ชีต 3: จัดลำดับความสำคัญ */
+    const s3 = wb.addWorksheet('จัดลำดับความสำคัญ');
+    setup(s3, [8,12,30,24,16,9,15,16,16], 5);
+    xTitle(s3, 'จัดลำดับคำขอทั้งโรงพยาบาล สำหรับพิจารณางบประมาณ', sub+' · เรียงตามความสำคัญ แล้วตามวงเงิน', 9);
+    s3.mergeCells('A3:B3');
+    Object.assign(s3.getCell('A3'), { value:'งบที่ได้รับ (บาท) →', font:{name:FONT,bold:true}, alignment:{horizontal:'right'} });
+    Object.assign(s3.getCell('C3'), { value:null, numFmt:MONEY, fill:fill(XC.warn), font:{name:FONT,bold:true,size:12},
+      border:{top:{style:'medium',color:{argb:'FFC77700'}},left:{style:'medium',color:{argb:'FFC77700'}},bottom:{style:'medium',color:{argb:'FFC77700'}},right:{style:'medium',color:{argb:'FFC77700'}}} });
+    Object.assign(s3.getCell('D3'), { value:'← กรอกวงเงินที่ได้รับ แล้วคอลัมน์ "ผลเทียบงบ" จะคำนวณให้', font:{name:FONT,color:{argb:XC.muted}} });
+    xHeader(s3, 5, ['ลำดับ','ความสำคัญ','รายการครุภัณฑ์','หน่วยงาน','ประเภท','จำนวน','รวมเงิน','ยอดสะสม','ผลเทียบงบ']);
+    const ranked = [...d.flat].sort((a,b)=>(PRI_ORDER[a.pri]??9)-(PRI_ORDER[b.pri]??9) || b.total-a.total);
+    ranked.forEach((i,k)=>{ const rn=6+k;
+      const row = xRow(s3, [k+1, i.pri, i.name, i.unit+(d.multiYear?` (${i.year})`:''), i.type, i.qty, i.total,
+        {formula:`SUM($G$6:G${rn})`}, {formula:`IF($C$3="","",IF(H${rn}<=$C$3,"อยู่ในกรอบงบ","เกินกรอบงบ"))`}],
+        { money:[7,8], align:['center',,,,'center','center',,,'center'] });
+      priCell(row.getCell(2), i.pri); row.getCell(8).font={name:FONT,bold:true};
+    });
+    const l3 = 5+ranked.length;
+    s3.addConditionalFormatting({ ref:`A6:I${l3}`, rules:[
+      { type:'expression', formulae:[`AND($C$3<>"",$H6>$C$3)`], style:{ fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFF1F3F5'}}, font:{color:{argb:'FF7A8796'}} } },
+      { type:'expression', formulae:[`AND($C$3<>"",$H6<=$C$3,OR($H7>$C$3,$H7=""))`], style:{ border:{bottom:{style:'thick',color:{argb:'FFC77700'}}} } } ]});
+    s3.addConditionalFormatting({ ref:`I6:I${l3}`, rules:[
+      { type:'containsText', operator:'containsText', text:'อยู่ในกรอบงบ', style:{ font:{bold:true,color:{argb:XC.teal}} } } ]});
+    s3.addRow([]);
+    const sumRow = (label, txt) => { const r=s3.addRow(['',label,'','','','',
+        {formula:`SUMIF(I6:I${l3},"${txt}",G6:G${l3})`},'',{formula:`COUNTIF(I6:I${l3},"${txt}")&" รายการ"`}]);
+      s3.mergeCells(r.number,2,r.number,6); r.getCell(2).alignment={horizontal:'right'};
+      r.eachCell(c=>c.font={name:FONT,bold:true}); r.getCell(7).numFmt=MONEY; };
+    sumRow('รวมรายการที่อยู่ในกรอบงบ','อยู่ในกรอบงบ'); sumRow('รวมรายการที่เกินกรอบงบ','เกินกรอบงบ');
+
+    /* ชีต 4: ข้อมูลดิบ (สำหรับกรอง / Pivot) */
+    const s4 = wb.addWorksheet('ข้อมูลดิบ');
+    s4.columns = [24,18,22,26,9,30,16,9,14,15,11,40].map(w=>({width:w}));
+    s4.views = [{state:'frozen', ySplit:1}];
+    xHeader(s4, 1, ['หน่วยงาน','สถานที่ตั้ง','หัวหน้าหน่วยงาน','ผู้รับผิดชอบ EQM','ปีงบ','ครุภัณฑ์','ประเภท','จำนวน','ราคา/หน่วย','รวมเงิน','ความสำคัญ','เหตุผล']);
+    d.flat.forEach(i=>xRow(s4,[i.unit,i.loc,i.head,i.eqm,i.year,i.name,i.type,i.qty,i.price,i.total,i.pri,i.why],{money:[9,10],align:[,,,,'center',,,'center',,,'center']}));
+    s4.autoFilter = { from:'A1', to:{row:1+d.flat.length, column:12} };
+
+    const buf = await wb.xlsx.writeBuffer();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download=`EQM-request-FY${fyFile(d)}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('ส่งออก Excel แล้ว');
+  }catch(e){ toast(e.message||'ส่งออกไม่สำเร็จ'); }
+  finally{ btn.disabled=false; btn.textContent='ส่งออก Excel'; }
+}
+const fyFile = d => /^\d{4}$/.test(d.yearLabel) ? d.yearLabel : "all";
+
+/* ---------- พิมพ์ใบเสนอขอ (A4 แนวนอน หน่วยงานละ 1 หน้า) ---------- */
+function bahtText(n){
+  n = Math.round(n*100)/100;
+  const D=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'], P=['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  const say = s => { let out=''; const L=s.length;
+    for(let k=0;k<L;k++){ const dgt=+s[k], pos=L-k-1; if(!dgt) continue;
+      if(pos===0 && dgt===1 && L>1) out+='เอ็ด';
+      else if(pos===1 && dgt===2) out+='ยี่';
+      else if(pos===1 && dgt===1) out+='';
+      else out+=D[dgt];
+      out+=P[pos]; }
+    return out; };
+  const big = s => { if(s.length>6) return big(s.slice(0,-6))+'ล้าน'+say(String(+s.slice(-6)||'')); return say(String(+s)); };
+  const [i,f]=n.toFixed(2).split('.');
+  const baht = +i ? big(i)+'บาท' : (+f ? '' : 'ศูนย์บาท');
+  return baht + (+f ? big(f)+'สตางค์' : 'ถ้วน');
+}
+
+function printForms(){
+  const d = exportData(); if(!d.groups.length) return toast('ยังไม่มีข้อมูลให้พิมพ์');
+  const f = n => Number(n).toLocaleString('th-TH');
+  const pages = d.groups.map((g,k)=>{
+    const total = reqTotal(g.r), qty = g.r.items.reduce((a,i)=>a+i.qty,0);
+    const eqm = g.u.persons[0] ? g.u.persons[0].name : '';
+    return `<section class="page">
+      <h1>แบบเสนอขอครุภัณฑ์ทางการแพทย์ ปีงบประมาณ ${esc(g.r.year)}</h1>
+      <div class="hosp">${esc(HOSPITAL_NAME)}</div>
+      <div class="info"><div><b>หน่วยงาน</b> ${esc(g.u.name)}</div><div><b>สถานที่ตั้ง</b> ${esc(g.u.loc||'-')}</div>
+        <div><b>หัวหน้าหน่วยงาน</b> ${esc(g.u.head)}</div><div><b>ผู้รับผิดชอบงาน EQM</b> ${esc(d.eqmOf(g.u))}</div></div>
+      <table><thead><tr><th style="width:5%">ที่</th><th>รายการครุภัณฑ์</th><th style="width:12%">ประเภท</th><th style="width:7%">จำนวน</th>
+        <th style="width:11%" class="r">ราคา/หน่วย</th><th style="width:12%" class="r">รวมเงิน (บาท)</th><th style="width:9%">ความสำคัญ</th><th style="width:24%">เหตุผลความจำเป็น</th></tr></thead>
+      <tbody>${g.r.items.map((i,n)=>`<tr><td class="c">${n+1}</td><td>${esc(i.name)}</td><td class="c">${esc(i.type)}</td><td class="c">${i.qty}</td>
+        <td class="r">${f(i.price)}</td><td class="r">${f(i.qty*i.price)}</td><td class="c${i.pri==='สูง'?' b':''}">${esc(i.pri)}</td><td>${esc(i.why)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="3" class="r">รวมทั้งสิ้น</td><td class="c">${qty}</td><td></td><td class="r">${f(total)}</td><td colspan="2">(${bahtText(total)})</td></tr>
+      </tbody></table>
+      <div class="sign">
+        <div><p>ลงชื่อ ...................................................</p><p>( ${esc(eqm)||'.................................................'} )</p><p>ผู้รับผิดชอบงาน EQM</p><p class="m">วันที่ ......../......../........</p></div>
+        <div><p>ลงชื่อ ...................................................</p><p>( ${esc(g.u.head)} )</p><p>หัวหน้าหน่วยงาน</p><p class="m">วันที่ ......../......../........</p></div>
+        <div><p>ลงชื่อ ...................................................</p><p>( ................................................. )</p><p>${esc(APPROVER_TITLE)}</p><p class="m">วันที่ ......../......../........</p></div>
+      </div>
+      <footer><span>พิมพ์จากระบบคำขอครุภัณฑ์ · ${nowTH()}</span><span>หน้า ${k+1} / ${d.groups.length}</span></footer>
+    </section>`; }).join('');
+  const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเสนอขอครุภัณฑ์</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page{size:A4 landscape;margin:12mm 14mm}
+    *{box-sizing:border-box} body{margin:0;font-family:"Sarabun","TH SarabunPSK",sans-serif;color:#111;background:#e9ecef}
+    .page{background:#fff;width:297mm;min-height:210mm;margin:12px auto;padding:12mm 14mm;display:flex;flex-direction:column;gap:10px}
+    h1{font-size:20px;text-align:center;margin:0} .hosp{text-align:center;font-size:16px;margin-top:-6px}
+    .info{display:grid;grid-template-columns:1fr 1fr;gap:3px 28px;border-top:1.5px solid #111;border-bottom:1.5px solid #111;padding:8px 0;font-size:15px}
+    table{width:100%;border-collapse:collapse;font-size:14px} th,td{border:1px solid #111;padding:5px 6px;vertical-align:top}
+    th{background:#e8ecef} .r{text-align:right} .c{text-align:center} .b{font-weight:700} .tot td{font-weight:700;background:#f3f5f7}
+    .sign{margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;text-align:center;font-size:14px;padding-top:28px;break-inside:avoid}
+    .sign p{margin:3px 0} .m{color:#444}
+    footer{display:flex;justify-content:space-between;font-size:11px;color:#555;border-top:1px solid #bbb;padding-top:5px}
+    .bar{position:sticky;top:0;background:#0f766e;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:15px}
+    .bar button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:6px 14px;cursor:pointer}
+    @media print{body{background:#fff}.bar{display:none}.page{margin:0;width:auto;min-height:calc(210mm - 24mm);padding:0;break-after:page}.page:last-child{break-after:auto}}
+  </style></head><body>
+  <div class="bar"><span>ใบเสนอขอครุภัณฑ์ ${d.groups.length} หน่วยงาน · ตั้งค่าเครื่องพิมพ์เป็น A4 แนวนอน</span><button onclick="print()">พิมพ์ / บันทึกเป็น PDF</button></div>
+  ${pages}</body></html>`;
+  const w = window.open('', '_blank');
+  if(!w) return toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาตป๊อปอัปสำหรับเว็บนี้');
+  w.document.open(); w.document.write(html); w.document.close();
+}
+$('#exportXlsx').onclick=exportExcel;
+$('#printForms').onclick=printForms;
 
 $('#reload').onclick=async()=>{ if(await api('list')) toast('อัปเดตข้อมูลล่าสุดแล้ว'); };
 
